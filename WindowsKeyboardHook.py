@@ -191,11 +191,12 @@ class ThreadRunning(QThread):  # 用 threading.Thread 的时候，英酷词典�
         self.args = args
         self.kwargs = kwargs
         self.result = 0
-        self.finished.connect(lambda: threadSet.discard(self))
+        # self.finished.connect(lambda: threadSet.discard(self))
         self.start()
 
     def run(self):
         self.func(*self.args)
+        threadSet.discard(self)
 
         # print('threadSet-------------',threadSet)
         # try:
