@@ -225,7 +225,7 @@ def lowLevelKeyboardHandler(nCode, wParam, lParam):
         return windll.user32.CallNextHookEx(ALL_Threads, nCode, wParam, lParam)
 
     virtualKeyCode = lParam[0]
-    # print(windll.user32.MapVirtualKeyW(virtualKeyCode,0) ,hex(virtualKeyCode),hex(wParam),pressedKeyCodeList)
+    print('pressed key code :' ,hex(virtualKeyCode))
 
     if wParam in {WM_KEYDOWN, WM_SYSKEYDOWN} and virtualKeyCode not in pressedKeyCodeList:  # 防止一直按住时的多次触发
         pressedKeyCodeList.append(virtualKeyCode)
@@ -295,8 +295,8 @@ def unhook(registeredKeyCombination2handlerInfo):
 
 
 if __name__ == "__main__":
-    hook({#在我的电脑上左右shift是不同的键，所以名字不能单独统一成shift；左边的alt键程序显示出来是Left MENU key；
-        ('left shift', ): [lambda: print('left shift'), False],  # 第三个参数是是否suppress;如果keyCombination改成list或set的话会TypeError: unhashable type: 'list'
+    hook({
+        ('left shift', ): [lambda: print('left shift'), False], 
         ('right shift',): [lambda: print('right shift'), False],        
         ('left ctrl', 'c'): [lambda: print('left ctrl c'), False],
         ('left menu', 'x'): [lambda: print('alt x'), True],
