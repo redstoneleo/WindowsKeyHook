@@ -34,5 +34,5 @@ Those passed to `unhook()` would be unhooked.
 
  The legal key names are also specified in this file,  notably, some key names used in program may not be the same as that have been printed on keys in your computer keyboard .  For example , the code name for  key with the printed name `Alt` in keyboard is `left menu`(key code:0xa4) or `right menu`(key code:0xa5) in program , [it is officially specified by Microsoft](https://docs.microsoft.com/zh-cn/windows/win32/inputdev/virtual-key-codes?redirectedfrom=MSDN). To save user from being confused by this divergence, `WindowsKeyboardHook` will print a message like `pressed key code : xxxx` if a key is pressed , then you can search the key code in `WindowsKeyboardHook.py` to find the correct code name for the key you need to use. 
  
-
+ 
 If you press the key combination that has been hooked without releasing for a little while , `WindowsKeyboardHook` won't run the callback repeatedly.
