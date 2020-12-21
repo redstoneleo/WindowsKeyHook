@@ -1,5 +1,4 @@
 # WindowsKeyboardHook
-Windows key combination hook by Python  .
 
 Windows key combination hook by Python  3 in a system(global) wide .
 
