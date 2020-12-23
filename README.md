@@ -1,6 +1,6 @@
 # WindowsKeyHook
 
-Windows key combination hook by Python  3 in a system(global) wide . The amount of code for this project is small, which makes it easy for anyone to change or add features. 
+Windows key combination hook by Python  3 in a system(global) wide . The amount of code for this project is small, which makes it easy to change or add features. 
 
 I started this project just because I found the following projects are buggy to use or lack the features I need at the time of 2020-12-21, and it is also complicated for me to contribute code to them:  [boppreh](https://github.com/boppreh)/**[keyboard](https://github.com/boppreh/keyboard)** , [moses-palmer](https://github.com/moses-palmer)/**[pynput](https://github.com/moses-palmer/pynput)**,   [pywinauto](https://github.com/pywinauto)/**[pywinauto](https://github.com/pywinauto/pywinauto)** ,    [Answeror](https://github.com/Answeror)/**[pyhook_py3k](https://github.com/Answeror/pyhook_py3k)**. 
 
