@@ -1,13 +1,10 @@
 import atexit
-import sys
+import threading
 from ctypes import *
 
 from ctypes import wintypes
 
 
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
 
 WH_KEYBOARD_LL = 13  # 全局hook都要用_LL，非WH_KEYBOARD
 WM_KEYDOWN = 0x0100
@@ -182,7 +179,40 @@ keyNameToKeyCode =  {
 }
 
 
-class ThreadRunning(QThread):  # 用 threading.Thread 的时候，英酷词典主窗口调用 Ctrl+C的时候会卡死，不知道为什么
+
+# from PyQt5.QtCore import *
+# from PyQt5.QtGui import *
+# from PyQt5.QtWidgets import *
+
+# class ThreadRunning2(QThread):  # 用 threading.Thread 的时候，英酷词典主窗口调用 Ctrl+C的时候会卡死，不知道为什么
+#     # implementing new slots in a QThread subclass is error-prone and discouraged.
+
+#     def __init__(self, func, *args, **kwargs):
+#         super().__init__()
+#         self.func = func
+#         self.args = args
+#         self.kwargs = kwargs
+#         self.result = 0
+#         # self.finished.connect(lambda: threadSet.discard(self))
+#         self.start()
+
+#     def run(self):
+#         self.func(*self.args)
+#         threadSet.discard(self)
+
+#         # print('threadSet-------------',threadSet)
+#         # try:
+#         #     self.result = self.func(*self.args)  # deleteLater
+#         # except Exception as e:
+#         #     raise e
+#         # print('ThreadRunning--------------{}---'.format(self.func.__name__), e)
+#         # logging.error('ThreadRunning---------------')
+
+#         # _, value, traceback = sys.exc_info()
+#         # print(type(e).__name__, e.args, sys.exc_info())
+#         # print('Error opening %s: %s' % (value.filename, value.strerror))
+
+class ThreadRunning(threading.Thread):  # 用 threading.Thread 的时候，英酷词典主窗口调用 Ctrl+C的时候会卡死，不知道为什么
     # implementing new slots in a QThread subclass is error-prone and discouraged.
 
     def __init__(self, func, *args, **kwargs):
@@ -197,18 +227,6 @@ class ThreadRunning(QThread):  # 用 threading.Thread 的时候，英酷词典�
     def run(self):
         self.func(*self.args)
         threadSet.discard(self)
-
-        # print('threadSet-------------',threadSet)
-        # try:
-        #     self.result = self.func(*self.args)  # deleteLater
-        # except Exception as e:
-        #     raise e
-        # print('ThreadRunning--------------{}---'.format(self.func.__name__), e)
-        # logging.error('ThreadRunning---------------')
-
-        # _, value, traceback = sys.exc_info()
-        # print(type(e).__name__, e.args, sys.exc_info())
-        # print('Error opening %s: %s' % (value.filename, value.strerror))
 
 
 pressedKeyCodeList = []
@@ -225,7 +243,7 @@ def lowLevelKeyboardHandler(nCode, wParam, lParam):
         return windll.user32.CallNextHookEx(ALL_Threads, nCode, wParam, lParam)
 
     virtualKeyCode = lParam[0]
-    print('pressed key code :' ,hex(virtualKeyCode))
+    print(f"{'pressed' if wParam in {WM_KEYDOWN, WM_SYSKEYDOWN} else 'released'} key code :{hex(virtualKeyCode)}")
 
     if wParam in {WM_KEYDOWN, WM_SYSKEYDOWN} and virtualKeyCode not in pressedKeyCodeList:  # 防止一直按住时的多次触发
         pressedKeyCodeList.append(virtualKeyCode)
