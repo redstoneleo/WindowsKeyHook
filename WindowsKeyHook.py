@@ -3,7 +3,8 @@ import threading
 from ctypes import *
 
 from ctypes import wintypes
-
+from ctypes import c_short, c_char, c_uint8, c_int32, c_int, c_uint, c_uint32, c_long, Structure, WINFUNCTYPE, POINTER
+from ctypes.wintypes import WORD, DWORD, BOOL, HHOOK, MSG, LPWSTR, WCHAR, WPARAM, LPARAM, LONG, HMODULE, LPCWSTR, HINSTANCE, HWND
 
 
 WH_KEYBOARD_LL = 13  # 全局hook都要用_LL，非WH_KEYBOARD
@@ -242,9 +243,8 @@ def lowLevelKeyboardHandler(nCode, wParam, lParam):
     if nCode < 0:
         return windll.user32.CallNextHookEx(ALL_Threads, nCode, wParam, lParam)
 
-    virtualKeyCode = lParam[0]
-    print(f"{'pressed' if wParam in {WM_KEYDOWN, WM_SYSKEYDOWN} else 'released'} key code :{hex(virtualKeyCode)}")
-
+    virtualKeyCode =  lParam.contents.vk_code#lParam[0]
+    # print(f"{'pressed' if wParam in {WM_KEYDOWN, WM_SYSKEYDOWN} else 'released'} key code :{hex(virtualKeyCode),virtualKeyCode}")
     if wParam in {WM_KEYDOWN, WM_SYSKEYDOWN} and virtualKeyCode not in pressedKeyCodeList:  # 防止一直按住时的多次触发
         pressedKeyCodeList.append(virtualKeyCode)
         handlerInfo = registeredKeyCodeList2handlerInfo.get(tuple(pressedKeyCodeList))
@@ -268,7 +268,19 @@ def lowLevelKeyboardHandler(nCode, wParam, lParam):
     return windll.user32.CallNextHookEx(ALL_Threads, nCode, wParam, lParam)  # Calling the windll.user32.CallNextHookEx function to chain to the next hook procedure is optional, but it is highly recommended; otherwise, other applications that have installed hooks will not receive hook notifications and may behave incorrectly as a result. You should call windll.user32.CallNextHookEx unless you absolutely need to prevent the notification from being seen by other applications.
 
 
-lowLevelKeyboardProcedureFunctionPrototype = WINFUNCTYPE(c_int, c_int, c_int, POINTER(c_void_p))
+
+ULONG_PTR = POINTER(DWORD)
+
+class KBDLLHOOKSTRUCT(Structure):#如果不定义的话那么lowLevelKeyboardHandler(nCode, wParam, lParam)的第三个参数就是一个莫名其妙的数字，用不了
+    _fields_ = [("vk_code", DWORD),
+                ("scan_code", DWORD),
+                ("flags", DWORD),
+                ("time", c_int),
+                ("dwExtraInfo", ULONG_PTR)]
+
+# lowLevelKeyboardProcedureFunctionPrototype = WINFUNCTYPE(c_int, c_int, c_int, POINTER(c_void_p))
+lowLevelKeyboardProcedureFunctionPrototype = WINFUNCTYPE(c_int, WPARAM, LPARAM, POINTER(KBDLLHOOKSTRUCT))
+
 
 windll.user32.SetWindowsHookExW.argtypes = (  # 要指定的，否则QT里call会出现argument 2: <class 'TypeError'>: expected WinFunctionType instance instead of WinFunctionType
     c_int,
@@ -278,13 +290,7 @@ windll.user32.SetWindowsHookExW.argtypes = (  # 要指定的，否则QT里call�
 
 lowLevelKeyboardProcedure = lowLevelKeyboardProcedureFunctionPrototype(lowLevelKeyboardHandler)
 
-
-windll.user32.CallNextHookEx.argtypes = (  # 要指定的，否则QT里call会出现argument 4: <class 'TypeError'>: wrong type
-    wintypes.HHOOK,
-    c_int,
-    wintypes.WPARAM,
-    POINTER(c_void_p))
-
+windll.user32.CallNextHookEx.argtypes = [c_int , c_int, c_int, POINTER(KBDLLHOOKSTRUCT)] # 要指定的，否则QT里call会出现argument 4: <class 'TypeError'>: wrong type
 
 registeredKeyCodeList2handlerInfo = {}
 hookHandle=None
@@ -295,7 +301,7 @@ def hook(registeredKeyCombination2handlerInfo):
 
     # print('hook--------------',registeredKeyCodeList2handlerInfo)
     
-    hookHandle = windll.user32.SetWindowsHookExW(WH_KEYBOARD_LL, lowLevelKeyboardProcedure, windll.kernel32.GetModuleHandleW(None), ALL_Threads)  # If the function succeeds, the return value is the handle to the hook procedure. If the function fails, the return value is NULL. To get extended error information, call GetLastError.
+    hookHandle = windll.user32.SetWindowsHookExW(WH_KEYBOARD_LL, lowLevelKeyboardProcedure,None, ALL_Threads)  # 32为是不是要用 windll.kernel32.GetModuleHandleW(None)？？？ If the function succeeds, the return value is the handle to the hook procedure. If the function fails, the return value is NULL. To get extended error information, call GetLastError.
 
     if hookHandle:
         atexit.register(windll.user32.UnhookWindowsHookEx, hookHandle)  # Before terminating, an application must call the UnhookWindowsHookEx function to free system resources associated with the hook.
@@ -314,7 +320,7 @@ def unhook(registeredKeyCombination2handlerInfo):
 
 if __name__ == "__main__":
     hook({
-        ('left shift', ): [lambda: print('left shift'), False], 
+        ('left shift', ): [lambda: print('left shift'), False], #按键顺序是有影响的
         ('right shift',): [lambda: print('right shift'), False],        
         ('left ctrl', 'c'): [lambda: print('left ctrl c'), False],
         ('left menu', 'x'): [lambda: print('alt x'), True],
