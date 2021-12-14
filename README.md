@@ -20,7 +20,7 @@ Download [WindowsKeyHook.py](https://github.com/redstoneleo/WindowsKeyHook/blob/
 
 The parameter to `hook()` is a dict object, every dict key is tuple of key combination , and the corresponding value is a list with the first item the callable corresponding to the key combination, it is run **asynchronously** in a Python  thread, and the second item a boolen value to specify [whether](https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms644985%28v=vs.85%29) preventing the system from passing the key combination message to the rest of the hook chain or the target window procedure.
 
-If you want to **unhook** a key  combination, just remove it from the above hook dict.
+If you want to **unhook** a key  combination, just comment or delete it from the above hook dict.
 
  The legal key names are also specified in this file,  notably, some key names used in program may not be the same as that have been printed on keys in your computer keyboard .  For example , the code name for  key with the printed name `Alt` in keyboard is `left menu`(key code:0xa4) or `right menu`(key code:0xa5) in program , [it is officially specified by Microsoft](https://docs.microsoft.com/zh-cn/windows/win32/inputdev/virtual-key-codes?redirectedfrom=MSDN). To save user from being confused by this divergence, `WindowsKeyHook` will print a message like `pressed key code : xxxx` or `released key code : xxxx` if a key is pressed or released , then you can search the key code in `WindowsKeyHook.py` to find the correct code name for the key you need to use. 
  
