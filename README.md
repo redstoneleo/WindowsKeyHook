@@ -15,8 +15,8 @@ Download [WindowsKeyHook.py](https://github.com/redstoneleo/WindowsKeyHook/blob/
         ('left shift', ): [lambda: print('left shift'), False], 
         ('right shift',): [lambda: print('right shift'), False],        
         ('left ctrl', 'c'): [lambda: print('left ctrl c'), False],
-        ('left menu', 'x'): [lambda: print('alt x'), True],
-    })#Alt + X
+        #('left menu', 'x'): [lambda: print('alt x'), True],#The way to unhook a key combination  
+    })
 
 The parameter to `hook()` is a dict object, every dict key is tuple of key combination , and the corresponding value is a list with the first item the callable corresponding to the key combination, it is run **asynchronously** in a Python  thread, and the second item a boolen value to specify [whether](https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms644985%28v=vs.85%29) preventing the system from passing the key combination message to the rest of the hook chain or the target window procedure.
 
