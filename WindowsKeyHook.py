@@ -1,11 +1,7 @@
 import atexit
 import threading
 from ctypes import *
-
-from ctypes import wintypes
-from ctypes import c_short, c_char, c_uint8, c_int32, c_int, c_uint, c_uint32, c_long, Structure, WINFUNCTYPE, POINTER
-from ctypes.wintypes import WORD, DWORD, BOOL, HHOOK, MSG, LPWSTR, WCHAR, WPARAM, LPARAM, LONG, HMODULE, LPCWSTR, HINSTANCE, HWND
-
+from ctypes.wintypes import *
 
 WH_KEYBOARD_LL = 13  # 全局hook都要用_LL，非WH_KEYBOARD
 WM_KEYDOWN = 0x0100
@@ -180,40 +176,63 @@ keyNameToKeyCode =  {
 }
 
 
+class RunInThread(threading.Thread):  # 用 threading.Thread 的时候，英酷词典主窗口调用 Ctrl+C的时候会卡死，不知道为什么
+    # implementing new slots in a QThread subclass is error-prone and discouraged.
 
-# from PyQt5.QtCore import *
-# from PyQt5.QtGui import *
-# from PyQt5.QtWidgets import *
+    def __init__(self, func, *args, **kwargs):
+        super().__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.result = 0
+        # self.finished.connect(lambda: threadSet.discard(self))
+        self.start()
 
-# class ThreadRunning2(QThread):  # 用 threading.Thread 的时候，英酷词典主窗口调用 Ctrl+C的时候会卡死，不知道为什么
-#     # implementing new slots in a QThread subclass is error-prone and discouraged.
+    def run(self):
+        self.func(*self.args)
+        # del self
+        # threadSet.discard(self)
 
-#     def __init__(self, func, *args, **kwargs):
-#         super().__init__()
-#         self.func = func
-#         self.args = args
-#         self.kwargs = kwargs
-#         self.result = 0
-#         # self.finished.connect(lambda: threadSet.discard(self))
-#         self.start()
 
-#     def run(self):
-#         self.func(*self.args)
-#         threadSet.discard(self)
+# ULONG_PTR = POINTER(DWORD)
 
-#         # print('threadSet-------------',threadSet)
-#         # try:
-#         #     self.result = self.func(*self.args)  # deleteLater
-#         # except Exception as e:
-#         #     raise e
-#         # print('ThreadRunning--------------{}---'.format(self.func.__name__), e)
-#         # logging.error('ThreadRunning---------------')
+class KBDLLHOOKSTRUCT(Structure):#如果不定义的话那么lowLevelKeyboardHandler(nCode, wParam, lParam)的第三个参数就是一个莫名其妙的数字，用不了
+    _fields_ = [("vkCode", DWORD),
+                ("scanCode", DWORD),
+                ("flags", DWORD),
+                ("time", c_int),
+                ("dwExtraInfo", DWORD)]
 
-#         # _, value, traceback = sys.exc_info()
-#         # print(type(e).__name__, e.args, sys.exc_info())
-#         # print('Error opening %s: %s' % (value.filename, value.strerror))
 
-class ThreadRunning(threading.Thread):  # 用 threading.Thread 的时候，英酷词典主窗口调用 Ctrl+C的时候会卡死，不知道为什么
+LowLevelKeyboardProcedureFunctionPrototype = WINFUNCTYPE(c_long, c_int, WPARAM, LPARAM)
+
+# LowLevelKeyboardProcedureFunctionPrototype = WINFUNCTYPE(c_int, c_int, WPARAM, LPARAM)
+# LowLevelKeyboardProcedureFunctionPrototype = WINFUNCTYPE(c_int, WPARAM, LPARAM, POINTER(KBDLLHOOKSTRUCT))
+
+windll.user32.SetWindowsHookExW.restype = HHOOK
+windll.user32.SetWindowsHookExW.argtypes = (  # 要指定的，否则QT里call会出现argument 2: <class 'TypeError'>: expected WinFunctionType instance instead of WinFunctionType
+    c_int,
+    LowLevelKeyboardProcedureFunctionPrototype,
+    HINSTANCE,
+    DWORD)
+
+
+
+
+# LRESULT = LPARAM
+# windll.user32.CallNextHookEx.restype = LRESULT
+# windll.user32.CallNextHookEx.argtypes = [c_int , c_int, c_int, POINTER(KBDLLHOOKSTRUCT)] # 要指定的，否则QT里call会出现argument 4: <class 'TypeError'>: wrong type
+
+LRESULT = LPARAM
+windll.user32.CallNextHookEx.restype = LRESULT
+windll.user32.CallNextHookEx.argtypes = (HHOOK,  # _In_opt_ hhk
+                                  c_int,  # _In_     nCode
+                                  WPARAM,  # _In_     wParam
+                                  LPARAM)  # _In_     lParam
+
+
+
+class RunInThread(threading.Thread):  # 用 threading.Thread 的时候，英酷词典主窗口调用 Ctrl+C的时候会卡死，不知道为什么
     # implementing new slots in a QThread subclass is error-prone and discouraged.
 
     def __init__(self, func, *args, **kwargs):
@@ -243,7 +262,8 @@ def lowLevelKeyboardHandler(nCode, wParam, lParam):
     if nCode < 0:
         return windll.user32.CallNextHookEx(ALL_Threads, nCode, wParam, lParam)
 
-    virtualKeyCode =  lParam.contents.vk_code#lParam[0]
+    # virtualKeyCode =  lParam.contents.vkCode#lParam[0]
+    virtualKeyCode = KBDLLHOOKSTRUCT.from_address(lParam).vkCode
     # print(f"{'pressed' if wParam in {WM_KEYDOWN, WM_SYSKEYDOWN} else 'released'} key code :{hex(virtualKeyCode),virtualKeyCode}")
     if wParam in {WM_KEYDOWN, WM_SYSKEYDOWN} and virtualKeyCode not in pressedKeyCodeList:  # 防止一直按住时的多次触发
         pressedKeyCodeList.append(virtualKeyCode)
@@ -252,7 +272,7 @@ def lowLevelKeyboardHandler(nCode, wParam, lParam):
         if handlerInfo:
             # print(handlerInfo,tuple(pressedKeyCodeList))
             func, suppress = handlerInfo
-            threadSet.add(ThreadRunning(func)) # 用threading.Thread(target=lambda: print(i))的话你看不到exception信息
+            threadSet.add(RunInThread(func)) # 用threading.Thread(target=lambda: print(i))的话你看不到exception信息
             
             if suppress:
                 return 1  # If the hook procedure processed the message, it may return a nonzero value to prevent the system from passing the message to the rest of the hook chain or the target window procedure.
@@ -269,33 +289,12 @@ def lowLevelKeyboardHandler(nCode, wParam, lParam):
 
 
 
-ULONG_PTR = POINTER(DWORD)
-
-class KBDLLHOOKSTRUCT(Structure):#如果不定义的话那么lowLevelKeyboardHandler(nCode, wParam, lParam)的第三个参数就是一个莫名其妙的数字，用不了
-    _fields_ = [("vk_code", DWORD),
-                ("scan_code", DWORD),
-                ("flags", DWORD),
-                ("time", c_int),
-                ("dwExtraInfo", ULONG_PTR)]
-
-# lowLevelKeyboardProcedureFunctionPrototype = WINFUNCTYPE(c_int, c_int, c_int, POINTER(c_void_p))
-lowLevelKeyboardProcedureFunctionPrototype = WINFUNCTYPE(c_int, WPARAM, LPARAM, POINTER(KBDLLHOOKSTRUCT))
-
-
-windll.user32.SetWindowsHookExW.argtypes = (  # 要指定的，否则QT里call会出现argument 2: <class 'TypeError'>: expected WinFunctionType instance instead of WinFunctionType
-    c_int,
-    lowLevelKeyboardProcedureFunctionPrototype,
-    wintypes.HINSTANCE,
-    wintypes.DWORD)
-
-lowLevelKeyboardProcedure = lowLevelKeyboardProcedureFunctionPrototype(lowLevelKeyboardHandler)
-
-windll.user32.CallNextHookEx.argtypes = [c_int , c_int, c_int, POINTER(KBDLLHOOKSTRUCT)] # 要指定的，否则QT里call会出现argument 4: <class 'TypeError'>: wrong type
+hookHandle=None
+lowLevelKeyboardProcedure = LowLevelKeyboardProcedureFunctionPrototype(lowLevelKeyboardHandler)
 
 registeredKeyCodeList2handlerInfo = {}
-hookHandle=None
 
-def hook(registeredKeyCombination2handlerInfo):
+def setUpHook(registeredKeyCombination2handlerInfo):
     for keyCombination in registeredKeyCombination2handlerInfo:
         registeredKeyCodeList2handlerInfo[tuple(map(lambda key: keyNameToKeyCode[key], keyCombination))]=registeredKeyCombination2handlerInfo[keyCombination]
 
@@ -305,27 +304,41 @@ def hook(registeredKeyCombination2handlerInfo):
 
     if hookHandle:
         atexit.register(windll.user32.UnhookWindowsHookEx, hookHandle)  # Before terminating, an application must call the UnhookWindowsHookEx function to free system resources associated with the hook.
+        if not registeredKeyCombination2handlerInfo:  # 空的就彻底unhook
+            windll.user32.UnhookWindowsHookEx(hookHandle)  # Before terminating, an application must call the UnhookWindowsHookEx function to free system resources associated with the hook.
 
+    msg = LPMSG()
+    while True:  # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmessagew
+        bRet = windll.user32.GetMessageW(byref(msg), None, 0, 0)  # the return value can be nonzero, zero, or -1
+        if not bRet:  # If the function retrieves the WM_QUIT message, the return value is zero.
+            break
+        elif bRet == -1:  # If there is an error, the return value is -1. For example, the function fails if hWnd is an invalid window handle or lpMsg is an invalid pointer. To get extended error information, call GetLastError.
+            raise WinError(get_last_error())
+        else:
+            windll.user32.TranslateMessage(byref(msg))
+            windll.user32.DispatchMessageW(byref(msg))
 
-def unhook(registeredKeyCombination2handlerInfo):
-    for keyCombination in registeredKeyCombination2handlerInfo:
-        registeredKeyCodeList2handlerInfo.pop(tuple(map(lambda key: keyNameToKeyCode[key], keyCombination)),None)#启动的时候如果没有勾选全局翻译就会执行这个，用pop不会出现异常，del则会，所以dict操作尽量pop None
+def hook(registeredKeyCombination2handlerInfo):  # 为了在GUI情况下防止卡顿
+    RunInThread(setUpHook, registeredKeyCombination2handlerInfo)
 
-    # print('unhook--------------',registeredKeyCodeList2handlerInfo)
+# def unhook(registeredKeyCombination2handlerInfo):
+#     for keyCombination in registeredKeyCombination2handlerInfo:
+#         registeredKeyCodeList2handlerInfo.pop(tuple(map(lambda key: keyNameToKeyCode[key], keyCombination)),None)#启动的时候如果没有勾选全局翻译就会执行这个，用pop不会出现异常，del则会，所以dict操作尽量pop None
 
-    if not registeredKeyCodeList2handlerInfo and hookHandle:
-        windll.user32.UnhookWindowsHookEx(hookHandle)  # Before terminating, an application must call the UnhookWindowsHookEx function to free system resources associated with the hook.
+#     # print('unhook--------------',registeredKeyCodeList2handlerInfo)
+
+#     if not registeredKeyCodeList2handlerInfo and hookHandle:
+#         windll.user32.UnhookWindowsHookEx(hookHandle)  # Before terminating, an application must call the UnhookWindowsHookEx function to free system resources associated with the hook.
 
 
 
 if __name__ == "__main__":
     hook({
-        ('left shift', ): [lambda: print('left shift'), False], #按键顺序是有影响的
+        ('left shift', ): [lambda: print('left shift'), False], #必须输入tuple作为key是因为list不能作为dict key,按键顺序是有影响的
         ('right shift',): [lambda: print('right shift'), False],        
         ('left ctrl', 'c'): [lambda: print('left ctrl c'), False],
         ('left menu', 'x'): [lambda: print('alt x'), True],
+        ('left windows',): [lambda: print('left windows'), True],
+
     })
 
-    msg = windll.user32.GetMessageW(None, 0, 0, 0)
-    windll.user32.TranslateMessage(byref(msg))
-    windll.user32.DispatchMessageW(byref(msg))
