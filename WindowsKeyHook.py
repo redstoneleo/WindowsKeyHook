@@ -232,22 +232,6 @@ windll.user32.CallNextHookEx.argtypes = (HHOOK,  # _In_opt_ hhk
 
 
 
-class RunInThread(threading.Thread):  # 用 threading.Thread 的时候，英酷词典主窗口调用 Ctrl+C的时候会卡死，不知道为什么
-    # implementing new slots in a QThread subclass is error-prone and discouraged.
-
-    def __init__(self, func, *args, **kwargs):
-        super().__init__()
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
-        self.result = 0
-        # self.finished.connect(lambda: threadSet.discard(self))
-        self.start()
-
-    def run(self):
-        self.func(*self.args)
-        threadSet.discard(self)
-
 
 pressedKeyCodeList = []
 threadSet=set()#否则thread会被gc
