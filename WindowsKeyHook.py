@@ -2,6 +2,7 @@ import atexit
 import threading
 from ctypes import *
 from ctypes.wintypes import *
+from ctypes import wintypes
 
 WH_KEYBOARD_LL = 13  # 全局hook都要用_LL，非WH_KEYBOARD
 WM_KEYDOWN = 0x0100
@@ -175,7 +176,6 @@ keyNameToKeyCode =  {
 'clear':   0xfe,
 }
 
-
 class RunInThread(threading.Thread):  # 用 threading.Thread 的时候，英酷词典主窗口调用 Ctrl+C的时候会卡死，不知道为什么
     # implementing new slots in a QThread subclass is error-prone and discouraged.
 
@@ -185,6 +185,7 @@ class RunInThread(threading.Thread):  # 用 threading.Thread 的时候，英酷�
         self.args = args
         self.kwargs = kwargs
         self.result = 0
+        # self.daemon = True
         # self.finished.connect(lambda: threadSet.discard(self))
         self.start()
 
@@ -231,6 +232,19 @@ windll.user32.CallNextHookEx.argtypes = (HHOOK,  # _In_opt_ hhk
                                   LPARAM)  # _In_     lParam
 
 
+windll.user32.GetMessageW.argtypes = (
+    c_voidp,  # Really _LPMSG
+    HWND,
+    UINT,
+    UINT)
+windll.user32.GetMessageW.restype = BOOL
+
+_PostThreadMessage = windll.user32.PostThreadMessageW
+_PostThreadMessage.argtypes = (
+    wintypes.DWORD,
+    wintypes.UINT,
+    wintypes.WPARAM,
+    wintypes.LPARAM)
 
 
 pressedKeyCodeList = []
@@ -283,17 +297,17 @@ def setUpHook(registeredKeyCombination2handlerInfo):
         registeredKeyCodeList2handlerInfo[tuple(map(lambda key: keyNameToKeyCode[key], keyCombination))]=registeredKeyCombination2handlerInfo[keyCombination]
 
     # print('hook--------------',registeredKeyCodeList2handlerInfo)
-    
+    global hookHandle
     hookHandle = windll.user32.SetWindowsHookExW(WH_KEYBOARD_LL, lowLevelKeyboardProcedure,None, ALL_Threads)  # 32为是不是要用 windll.kernel32.GetModuleHandleW(None)？？？ If the function succeeds, the return value is the handle to the hook procedure. If the function fails, the return value is NULL. To get extended error information, call GetLastError.
 
     if hookHandle:
         atexit.register(windll.user32.UnhookWindowsHookEx, hookHandle)  # Before terminating, an application must call the UnhookWindowsHookEx function to free system resources associated with the hook.
         if not registeredKeyCombination2handlerInfo:  # 空的就彻底unhook
             windll.user32.UnhookWindowsHookEx(hookHandle)  # Before terminating, an application must call the UnhookWindowsHookEx function to free system resources associated with the hook.
-
-    msg = LPMSG()
+    
+    msg = MSG()  # https://stackoverflow.com/questions/31379169/setting-up-a-windowshook-in-python-ctypes-windows-api
     while True:  # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmessagew
-        bRet = windll.user32.GetMessageW(byref(msg), None, 0, 0)  # the return value can be nonzero, zero, or -1
+        bRet = windll.user32.GetMessageW(byref(msg), 0, 0, 0)  # the return value can be nonzero, zero, or -1
         if not bRet:  # If the function retrieves the WM_QUIT message, the return value is zero.
             break
         elif bRet == -1:  # If there is an error, the return value is -1. For example, the function fails if hWnd is an invalid window handle or lpMsg is an invalid pointer. To get extended error information, call GetLastError.
@@ -302,9 +316,18 @@ def setUpHook(registeredKeyCombination2handlerInfo):
             windll.user32.TranslateMessage(byref(msg))
             windll.user32.DispatchMessageW(byref(msg))
 
-def hook(registeredKeyCombination2handlerInfo):  # 为了在GUI情况下防止卡顿
-    RunInThread(setUpHook, registeredKeyCombination2handlerInfo)
 
+messageThreadID = 0
+
+def hook(registeredKeyCombination2handlerInfo):  # 为了在GUI情况下防止卡顿
+    global messageThreadID
+    messageThreadID = RunInThread(setUpHook, registeredKeyCombination2handlerInfo).native_id
+
+def unHookAll():  # 为了在GUI情况下防止卡顿
+    windll.user32.UnhookWindowsHookEx(hookHandle)  # Before terminating, an application must call the UnhookWindowsHookEx function to free system resources associated with the hook.
+
+    WM_QUIT = 0x0012
+    _PostThreadMessage(messageThreadID, WM_QUIT, 0, 0)
 # def unhook(registeredKeyCombination2handlerInfo):
 #     for keyCombination in registeredKeyCombination2handlerInfo:
 #         registeredKeyCodeList2handlerInfo.pop(tuple(map(lambda key: keyNameToKeyCode[key], keyCombination)),None)#启动的时候如果没有勾选全局翻译就会执行这个，用pop不会出现异常，del则会，所以dict操作尽量pop None
@@ -317,6 +340,7 @@ def hook(registeredKeyCombination2handlerInfo):  # 为了在GUI情况下防止�
 
 
 if __name__ == "__main__":
+
     hook({
         ('left shift', ): [lambda: print('left shift'), False], #必须输入tuple作为key是因为list不能作为dict key,按键顺序是有影响的
         ('right shift',): [lambda: print('right shift'), False],        
@@ -325,4 +349,10 @@ if __name__ == "__main__":
         ('left windows',): [lambda: print('left windows'), True],
 
     })
+
+
+    from threading import Timer, Thread
+
+    t = Timer(5.0, unHookAll)
+    t.start()
 
